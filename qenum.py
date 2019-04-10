@@ -212,6 +212,7 @@ def nmapScan(target):
             commands = {
                 'nmap': 'nmap -sV -sC -p {} -oN {}/smb_{}.nmap {}'.format(p, target, p, target),
                 'nmap2': 'nmap -n -sV -Pn -pT:139,{},U:137 --script=smb-enum-shares,smb-enum-domains,smb-enum-groups,smb-enum-processes,smb-enum-sessions,smb-ls,smb-mbenum,smb-os-discovery,smb-print-text,smb-security-mode,smb-server-stats,smb-system-info,smb-vuln* -oN {}/smb2_{}.nmap {}'.format(p, target, p, target),
+                'nmap3': 'nmap --script smb-vuln\* -p {} {}'.format(p, target),
                 'smbclient': 'smbclient -L\\\\ -N -I {}'.format(target),
                 'smbclient2': 'smbclient -U guest -L\\\\ -N -I {}'.format(target),
                 'enum4linux': 'enum4linux {} | tee {}/logs/enum4linux'.format(target, target),
@@ -285,6 +286,7 @@ def nmapScan(target):
                 'walk3': 'snmpwalk -c public -v1 {} 1.3.6.1.2.1.6.13.1.3 | tee {}/logs/snmp_ports'.format(target, target),
                 'walk4': 'snmpwalk -c public -v1 {} 1.3.6.1.2.1.25.4.2.1.2 | tee {}/logs/snmp_process'.format(target, target),
                 'walk5': 'snmpwalk -c public -v1 {} 1.3.6.1.2.1.25.6.3.1.2 | tee {}/logs/snmp_software'.format(target, target),
+                'nmap2': 'nmap --script snmp-brute --script-args snmp-brute.communitiesdb=/root/tools/SecLists/Discovery/SNMP/common-snmp-community-strings.txt -p {} {}'.format(p, target),
             }
             for k in commands:
                 print("    " + commands[k])
@@ -307,6 +309,9 @@ def nmapScan(target):
             commands = {
                 'nmap': 'nmap -sV -sC -p {} -oN {}/logs/dns_{}.nmap {}'.format(p, target, p, target),
                 'nmap2': 'nmap -oN {}/logs/dns2_{}.nmap --script dns-zone-transfer,dns-srv-enum,dns-nsid,dns-check-zone,dns-service-discovery -p {} {}'.format(target, target, p, target),
+                'dig': 'dig axfr $DOMAIN @{}'.format(target),
+                'host': 'host -l $DOMAIN {}'.format(target),
+                'dnsrecon': 'dnsrecon -d $DOMAIN -t axfr -n {}'.format(target),
             }
             for k in commands:
                 print("    " + commands[k])
