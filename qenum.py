@@ -12,6 +12,7 @@ import sys
 import time
 
 from pprint import pprint as pp
+from libnmap.parser import NmapParser
 
 def info(msg):
     print("\n[*] {}".format(msg))
@@ -31,13 +32,9 @@ def nmapScan(target):
 
     open_tcp_ports = []
 
-    f = open('{}/quick.gnmap'.format(target), 'r')
-    for line in f:
-        m = re.match('^Host:.*Ports:(.*)(Ignored State:.*)?', line)
-
-        if m:
-            for portline in m.groups()[0].strip().split(','):
-                open_tcp_ports.append(re.match('^(\d+)', portline.strip())[0])
+    quick_report = NmapParser.parse_fromfile('{}/quick.xml'.format(target))
+    for port in quick_report.hosts[0].get_ports():
+        open_tcp_ports.append(str(port[0]))
 
     if len(open_tcp_ports) < 1:
         err('Could not find any open TCP ports?')
@@ -55,20 +52,15 @@ def nmapScan(target):
 
     all_ports = {'tcp': {}, 'udp': {}}
 
-    f = open('{}/full.gnmap'.format(target), 'r')
-    for line in f:
-        m = re.match('^Host:.*Ports:(.*)(Ignored State:.*)?', line)
-        
-        if m:
-            for portline in m.groups()[0].strip().split(','):
-                (port,status,layer,owner,service,rpc,version,_) = portline.strip().split('/') 
-                all_ports['tcp'][port] = {
-                    'status': status,
-                    'layer': layer,
-                    'service': service,
-                    'rpc info': rpc,
-                    'version': version,
-                }
+    full_report = NmapParser.parse_fromfile('{}/full.xml'.format(target))
+    for service in full_report.hosts[0].services:
+        s = service.get_dict()
+        all_ports['tcp'][s['port']] = {
+            'status': s['state'],
+            'protocol': s['protocol'],
+            'service': s['service'],
+            'version': s['banner'],
+        }
 
     info('Please see {}/full.nmap for all nmap output (including script results)'.format(target))
     info('To consult exploit-db run: searchsploit --nmap {}/full.xml'.format(target))
