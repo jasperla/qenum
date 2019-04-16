@@ -33,11 +33,20 @@ def nmapScan(target):
 
     f = open('{}/quick.gnmap'.format(target), 'r')
     for line in f:
-        m = re.match('^Host:.*Ports:(.*)Ignored State:.*', line)
+        m = re.match('^Host:.*Ports:(.*)(Ignored State:.*)?', line)
 
         if m:
             for portline in m.groups()[0].strip().split(','):
                 open_tcp_ports.append(re.match('^(\d+)', portline.strip())[0])
+
+    if len(open_tcp_ports) < 1:
+        err('Could not find any open TCP ports?')
+        sys.exit(1)
+
+    print('Found the following open TCP ports: {}'.format(' '.join(open_tcp_ports)))
+
+    info('Consider running the following scan for UDP:')
+    print('nmap -Pn -sU --stats-every 1m -oA {}/udp {}'.format(target, target))
 
     info("Running full TCP nmap scan on {} open ports".format(len(open_tcp_ports)))
     full_scan = 'nmap --stats-every 1m -Pn -v0 -A -sV -T4 -p' + ','.join(open_tcp_ports) + ' -oA ' + target + '/full ' + target
@@ -62,9 +71,7 @@ def nmapScan(target):
                 }
 
     info('Please see {}/full.nmap for all nmap output (including script results)'.format(target))
-
-    info('Consider running the following scan for UDP:')
-    print('nmap -Pn -sU --stats-every 1m -oA {}/udp {}'.format(target, target))
+    info('To consult exploit-db run: searchsploit --nmap {}/full.xml'.format(target))
 
     # Now for all the found ports go through them and see if we can run further nmap scripts
     # on them. If that is the case run it and store the results in a file in the same directory.
@@ -87,14 +94,14 @@ def nmapScan(target):
             handled_ports.append(p)
             continue
 
-        if port['service'] in ['https', 'ssl/http']:
+        if port['service'] in ['https', 'ssl/http', 'ssl|http']:
             ok('Found HTTPS service on port {}:{} as "{}". Consider running the following commands:'.format(p, port['service'], port['version']))
             commands = [
               '/root/tools/droopescan/droopescan scan drupal -u https://{}:{} --hide-progressbar | tee {}/logs/droopescan_{}'.format(target, p, target, p),
               '~/go/bin/gobuster -x html,asp,aspx,php,txt -k -u https://{}:{} -w /root/tools/SecLists/Discovery/Web-Content/common.txt -o {}/logs/gobuster_common_{}'.format(target, p, target, p),
               '~/go/bin/gobuster -x html,asp,php,aspx,txt -k -u https://{}:{} -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt -o {}/logs/gobuster_{}'.format(target, p, target, p),
-              'nikto -h https://{} -p {} -ssl | tee {}/logs/nikto_{}'.format(target, p, target, p),
-              'nmap --script http-vuln\* -p {} -oN {}/logs/nmap_https_{}_vuln target'.format(p, target, target, p),
+              'nikto -h https://{}:{} -ssl | tee {}/logs/nikto_{}'.format(target, p, target, p),
+              'nmap --script http-vuln\* -p {} -oN {}/logs/nmap_https_{}_vuln {}'.format(p, target, target, p, target),
               'nmap -sV -sC -p {} -oN {}/logs/nmap_https_{} {}'.format(p, target, target, p),
               'curl -k https://{}:{}/robots.txt'.format(target, p),
               'nmap -p {} --script http-shellshock --script-args uri=/cgi-bin/bin,cmd=ls {}'.format(p, target),
@@ -115,8 +122,8 @@ def nmapScan(target):
               '/root/tools/droopescan/droopescan scan drupal -u http://{}:{} --hide-progressbar | tee {}/logs/droopescan_{}'.format(target, p, target, p),
               '~/go/bin/gobuster -x html,asp,aspx,php,txt -k -u http://{}:{} -w /root/tools/SecLists/Discovery/Web-Content/common.txt -o {}/logs/gobuster_common_{}'.format(target, p, target, p),
               '~/go/bin/gobuster -x html,asp,php,aspx,txt -k -u http://{}:{} -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt -o {}/logs/gobuster_{}'.format(target, p, target, p),
-              'nikto -h http://{} -p {} | tee {}/logs/nikto_{}'.format(target, p, target, p),
-              'nmap --script http-vuln\* -p {} -oN {}/logs/nmap_http_{}_vuln target'.format(p, target, target, p),
+              'nikto -h http://{}:{} | tee {}/logs/nikto_{}'.format(target, p, target, p),
+              'nmap --script http-vuln\* -p {} -oN {}/logs/nmap_http_{}_vuln {}'.format(p, target, target, p, target),
               'nmap -sV -sC -p {} -oN {}/logs/nmap_http_{} {}'.format(p, target, target, p),
               'curl -k http://{}:{}/robots.txt'.format(target, p),
               'nmap -p {} --script http-shellshock --script-args uri=/cgi-bin/bin,cmd=ls {}'.format(p, target),
@@ -188,7 +195,7 @@ def nmapScan(target):
         if port['service'] == 'apanil':
             ok('Found cassandra service on port {}'.format(p))
             commands = [
-                'nmap -sV --script=cassandra-* -p {} -oN {}/cassandra_{}.nmap {}'.format(p, target, p, target)
+                'nmap -sV --script=cassandra-\* -p {} -oN {}/cassandra_{}.nmap {}'.format(p, target, p, target)
             ]
             for k in commands:
                 print("    " + k)
@@ -211,7 +218,7 @@ def nmapScan(target):
             ok('Found netbios service on port {}: {}'.format(p, port['version']))
             commands = [
                 'nmap -sV -sC -p {} -oN {}/smb_{}.nmap {}'.format(p, target, p, target),
-                'nmap -n -sV -Pn -pT:139,{},U:137 --script=smb-enum-shares,smb-enum-domains,smb-enum-groups,smb-enum-processes,smb-enum-sessions,smb-ls,smb-mbenum,smb-os-discovery,smb-print-text,smb-security-mode,smb-server-stats,smb-system-info,smb-vuln* -oN {}/smb2_{}.nmap {}'.format(p, target, p, target),
+                'nmap -n -sV -Pn -pT:139,{},U:137 --script=smb-enum-shares,smb-enum-domains,smb-enum-groups,smb-enum-processes,smb-enum-sessions,smb-ls,smb-mbenum,smb-os-discovery,smb-print-text,smb-security-mode,smb-server-stats,smb-system-info,smb-vuln\* -oN {}/smb2_{}.nmap {}'.format(p, target, p, target),
                 'nmap --script smb-vuln\* -p {} {}'.format(p, target),
                 'smbclient -L\\\\ -N -I {}'.format(target),
                 'smbclient -U guest -L\\\\ -N -I {}'.format(target),
