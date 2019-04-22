@@ -46,7 +46,7 @@ def nmapScan(target):
     print('nmap -Pn -sU --stats-every 1m -oA {}/udp {}'.format(target, target))
 
     info("Running full TCP nmap scan on {} open ports".format(len(open_tcp_ports)))
-    full_scan = 'nmap --stats-every 1m -Pn -v0 -A -sV -T4 -p' + ','.join(open_tcp_ports) + ' -oA ' + target + '/full ' + target
+    full_scan = 'nmap --stats-every 1m -Pn -v0 -A -sV --script vulners -T4 -p' + ','.join(open_tcp_ports) + ' -oA ' + target + '/full ' + target
     print(full_scan)
     os.system(full_scan)
 
@@ -89,14 +89,14 @@ def nmapScan(target):
         if port['service'] in ['https', 'ssl/http', 'ssl|http']:
             ok('Found HTTPS service on port {}:{} as "{}". Consider running the following commands:'.format(p, port['service'], port['version']))
             commands = [
+              'nmap --script http-vuln\* -p {} -oN {}/logs/nmap_https_{}_vuln {}'.format(p, target, target, p, target),
+              'nmap -p {} --script http-shellshock --script-args uri=/cgi-bin/bin,cmd=ls {}'.format(p, target),
+              'nmap -sV -sC -p {} -oN {}/logs/nmap_https_{} {}'.format(p, target, target, p),
               '/root/tools/droopescan/droopescan scan drupal -u https://{}:{} --hide-progressbar | tee {}/logs/droopescan_{}'.format(target, p, target, p),
               '~/go/bin/gobuster -x html,asp,aspx,php,txt -k -u https://{}:{} -w /root/tools/SecLists/Discovery/Web-Content/common.txt -o {}/logs/gobuster_common_{}'.format(target, p, target, p),
               '~/go/bin/gobuster -x html,asp,php,aspx,txt -k -u https://{}:{} -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt -o {}/logs/gobuster_{}'.format(target, p, target, p),
               'nikto -h https://{}:{} -ssl | tee {}/logs/nikto_{}'.format(target, p, target, p),
-              'nmap --script http-vuln\* -p {} -oN {}/logs/nmap_https_{}_vuln {}'.format(p, target, target, p, target),
-              'nmap -sV -sC -p {} -oN {}/logs/nmap_https_{} {}'.format(p, target, target, p),
               'curl -k https://{}:{}/robots.txt'.format(target, p),
-              'nmap -p {} --script http-shellshock --script-args uri=/cgi-bin/bin,cmd=ls {}'.format(p, target),
               '/root/tools/testssl.sh/testssl.sh https://{} | tee {}/logs/testssl_{}'.format(target, target, p),
               '/root/tools/wig/wig.py -w {}/logs/wig https://{}:{}'.format(target, target, p),
               'wpscan -u https://{}:{} --wordlist /root/tools/SecLists/Passwords/Common-Credentials/10k-most-common.txt --username admin | tee {}/logs/wpscan_brute'.format(target, p, target),
@@ -111,14 +111,14 @@ def nmapScan(target):
         if 'http' in port['service']:
             ok('Found HTTP-like service on port {}:{} as "{}". Consider running the following commands:'.format(p, port['service'], port['version']))
             commands = [
+              'nmap --script http-vuln\* -p {} -oN {}/logs/nmap_http_{}_vuln {}'.format(p, target, target, p, target),
+              'nmap -sV -sC -p {} -oN {}/logs/nmap_http_{} {}'.format(p, target, target, p),
+              'nmap -p {} --script http-shellshock --script-args uri=/cgi-bin/bin,cmd=ls {}'.format(p, target),
               '/root/tools/droopescan/droopescan scan drupal -u http://{}:{} --hide-progressbar | tee {}/logs/droopescan_{}'.format(target, p, target, p),
               '~/go/bin/gobuster -x html,asp,aspx,php,txt -k -u http://{}:{} -w /root/tools/SecLists/Discovery/Web-Content/common.txt -o {}/logs/gobuster_common_{}'.format(target, p, target, p),
               '~/go/bin/gobuster -x html,asp,php,aspx,txt -k -u http://{}:{} -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt -o {}/logs/gobuster_{}'.format(target, p, target, p),
               'nikto -h http://{}:{} | tee {}/logs/nikto_{}'.format(target, p, target, p),
-              'nmap --script http-vuln\* -p {} -oN {}/logs/nmap_http_{}_vuln {}'.format(p, target, target, p, target),
-              'nmap -sV -sC -p {} -oN {}/logs/nmap_http_{} {}'.format(p, target, target, p),
               'curl -k http://{}:{}/robots.txt'.format(target, p),
-              'nmap -p {} --script http-shellshock --script-args uri=/cgi-bin/bin,cmd=ls {}'.format(p, target),
               '/root/tools/wig/wig.py -w {}/logs/wig http://{}:{}'.format(target, target, p),
               'wpscan -u http://{}:{} --wordlist /root/tools/SecLists/Passwords/Common-Credentials/10k-most-common.txt --username admin | tee {}/logs/wpscan_brute'.format(target, p, target),
               'wpscan -u http://{}:{} | tee {}/logs/wpscan_{}'.format(target, p, target, p),
@@ -215,6 +215,7 @@ def nmapScan(target):
                 'smbclient -L\\\\ -N -I {}'.format(target),
                 'smbclient -U guest -L\\\\ -N -I {}'.format(target),
                 'enum4linux {} | tee {}/logs/enum4linux'.format(target, target),
+                'smbmap -H {} | tee {}/logs/smbmap'.format(target),
             ]
             for k in commands:
                 print("    " + k)
