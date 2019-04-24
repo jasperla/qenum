@@ -215,7 +215,7 @@ def nmapScan(target):
                 'smbclient -L\\\\ -N -I {}'.format(target),
                 'smbclient -U guest -L\\\\ -N -I {}'.format(target),
                 'enum4linux {} | tee {}/logs/enum4linux'.format(target, target),
-                'smbmap -H {} | tee {}/logs/smbmap'.format(target),
+                'smbmap -H {} | tee {}/logs/smbmap'.format(target, target),
             ]
             for k in commands:
                 print("    " + k)
